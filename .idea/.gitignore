@@ -1,0 +1,35 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Ignored default folder with query files
+/queries/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+ # Java build output
+ target/
+ *.class
+ *.jar
+ *.war
+
+ # IDE
+ .idea/
+ .vscode/
+ *.iml
+
+ # Maven
+ .mvn/wrapper/maven-wrapper.jar
+
+ # Environment / secrets
+ .env
+ *.env
+ application-local.yml
+
+ # Docker override
+ docker-compose.override.yml
+
+ # OS
+ .DS_Store
+ Thumbs.db
