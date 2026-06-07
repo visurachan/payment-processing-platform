@@ -1,0 +1,161 @@
+services:
+
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports: ["2181:2181"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on: [zookeeper]
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  redis:
+    image: redis:7-alpine
+    container_name: platform-redis
+    ports: ["6379:6379"]
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports: ["9411:9411"]
+
+  # ── Databases — one per service ───────────────────────────────────────────
+  payment-db:
+    image: postgres:15
+    container_name: payment-db
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5480:5432"]
+    volumes: ["payment_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  account-db:
+    image: postgres:15
+    container_name: account-db
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5433:5432"]
+    volumes: ["account_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d account_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  audit-db:
+    image: postgres:15
+    container_name: audit-db
+    environment:
+      POSTGRES_DB: audit_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5434:5432"]
+    volumes: ["audit_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d audit_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Banking core instances ────────────────────────────────────────────────
+  # Start separately: cd banking-core-standalone && docker compose up --build -d
+  # Bank A → http://localhost:8090
+  # Bank B → http://localhost:8091
+
+  # ── Platform services ─────────────────────────────────────────────────────
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    ports: ["8081:8081"]
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-db:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+
+  account-service:
+    build: ./account-service
+    container_name: account-service
+    ports: ["8082:8082"]
+    depends_on:
+      account-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://account-db:5432/account_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      BANKING_BANKS_BANK-A: http://host.docker.internal:8090
+      BANKING_BANKS_BANK-B: http://host.docker.internal:8091
+
+  webhook-service:
+    build: ./webhook-service
+    container_name: webhook-service
+    ports: ["8083:8083"]
+    depends_on:
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+
+  audit-service:
+    build: ./audit-service
+    container_name: audit-service
+    ports: ["8085:8085"]
+    depends_on:
+      audit-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://audit-db:5432/audit_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports: ["8080:8080"]
+    depends_on:
+      - redis
+      - payment-service
+      - audit-service
+    environment:
+      SPRING_DATA_REDIS_HOST: platform-redis
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+
+volumes:
+  payment_data:
+  account_data:
+  audit_data:

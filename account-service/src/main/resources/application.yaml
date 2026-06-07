@@ -1,0 +1,80 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: account-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/account_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: account-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+banking:
+  banks:
+    bank-a: http://localhost:8090
+    bank-b: http://localhost:8091
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      bankClient:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        recordExceptions:
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+  retry:
+    instances:
+      bankClient:
+        maxAttempts: 3
+        waitDuration: 500ms
+        retryExceptions:
+          - java.net.ConnectException
+  bulkhead:
+    instances:
+      bankClient:
+        maxConcurrentCalls: 10
+        maxWaitDuration: 100ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.payment_processing_platform: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
