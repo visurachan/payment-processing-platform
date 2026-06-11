@@ -31,19 +31,22 @@ public class Payment {
     private String sourceBankId;
 
     @Column(name = "source_account_id", nullable = false)
-    private String sourceAccountId;
+    private String sourceAccountNumber;
 
     @Column(name = "destination_bank_id", nullable = false)
     private String destinationBankId;
 
     @Column(name = "destination_account_id", nullable = false)
-    private String destinationAccountId;
+    private String destinationAccountNumber;
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
     @Column(nullable = false, length = 3)
     private String currency;
+
+    @Column(name = "reference")
+    private String reference;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
