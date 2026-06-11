@@ -6,7 +6,7 @@
 ---
 
 ## Phase 1 — Foundation ✅
-**Completed: 11 June 2026**
+
 
 ### What was built
 - API Gateway with Spring Cloud Gateway routing all external traffic
@@ -53,8 +53,28 @@
   event stays PENDING until we know Kafka got it
 
 
-### Part 2 — Saga Happy Path 
-*Next — wire up Fraud Service Kafka consumer*
+### Part 2 — Fraud Service ✅
+
+#### What was built
+- Fraud service as independent stateless service in payment platform
+- Consumes PaymentInitiated events from payments.initiated Kafka topic
+- FraudRuleEngine with 3 rules:
+  - Self payment — source and destination same account same bank
+  - Cross-bank large amount — over £5000 between different banks
+  - Invalid amount — null or zero amount
+- Publishes FraudChecked event to payments.fraud.checked topic
+- No database — purely event driven, consume and publish
+
+#### Key decisions
+- Kept fraud service lightweight —  three simple rules
+  that only the platform can detect, not the individual bank
+- Stateless design — no persistence needed, rules run in memory
+- Separate from banking core fraud service — different concerns,
+  different layer, different rules
+
+
+### Part 3 — Saga Happy Path
+*Next — Account service consumes FraudChecked, call banking core, publish AccountDebited*
 
 ### Part 3 — Saga Compensation 
 *Not started*
