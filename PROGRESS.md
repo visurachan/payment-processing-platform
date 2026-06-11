@@ -27,8 +27,37 @@
 - 202 Accepted not 200 OK — payment is queued not completed instantly
 
 
-## Phase 2 — Core Saga 🔄
-*In progress*
+## Phase 2 — Core Saga 
+**In progress — Started June 2026**
+
+### Part 1 — Outbox Pattern 
+
+#### What was built
+- OutboxPublisher — @Scheduled poller running every 500ms
+- Outbox event written atomically with payment record in same
+  @Transactional block — either both commit or both rollback
+- PaymentInitiated payload built from Payment entity and serialised
+  to JSON using ObjectMapper
+- Poller publishes PENDING outbox events to correct Kafka topic
+  based on event type
+- On successful Kafka publish — status flips PENDING → PUBLISHED
+  with published_at timestamp
+
+#### Key decisions
+- Payload is a separate record not the full Payment entity — consuming
+  services only get what they need, no internal fields exposed
+- paymentId used as Kafka message key — guarantees all events for same
+  payment land on same partition in order
+- Kafka auto-creates topics 
+- .get(5, TimeUnit.SECONDS) blocks until Kafka confirms receipt —
+  event stays PENDING until we know Kafka got it
+
+
+### Part 2 — Saga Happy Path 
+*Next — wire up Fraud Service Kafka consumer*
+
+### Part 3 — Saga Compensation 
+*Not started*
 
 ---
 
