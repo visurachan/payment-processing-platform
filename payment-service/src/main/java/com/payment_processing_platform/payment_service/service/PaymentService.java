@@ -1,9 +1,12 @@
 package com.payment_processing_platform.payment_service.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payment_processing_platform.payment_service.dto.InitiatePaymentRequest;
 import com.payment_processing_platform.payment_service.dto.PaymentResponse;
 import com.payment_processing_platform.payment_service.entity.Enums.PaymentStatus;
+import com.payment_processing_platform.payment_service.entity.OutboxEvent;
 import com.payment_processing_platform.payment_service.entity.Payment;
+import com.payment_processing_platform.payment_service.repository.OutboxRepository;
 import com.payment_processing_platform.payment_service.repository.PaymentRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,8 @@ import java.util.UUID;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public PaymentResponse initiatePayment(String idempotencyKey, String merchantId, @Valid InitiatePaymentRequest request) {
@@ -52,9 +57,42 @@ public class PaymentService {
                     log.info("Payment created - id: {}, merchant: {}, amount: {} {}",
                             payment.getId(), merchantId,
                             request.amount(), request.currency());
+                    try {
+                        String payLoad = objectMapper.writeValueAsString(
+                                buildPaymentInitiatedPayload(saved));
+                        OutboxEvent outboxEvent = OutboxEvent.builder()
+                                .aggregateId(saved.getId())
+                                .eventType("PaymentInitiated")
+                                .payload(payLoad)
+                                .build();
+
+                        outboxRepository.save(outboxEvent);
+
+                        log.info("Payment {} created with outbox event — merchant: {}",
+                                saved.getId(), merchantId);
+                    } catch (Exception e) {
+                        log.error("Failed to create outbox event for payment {}",
+                                saved.getId(), e);
+                        throw new RuntimeException("Failed to create payment event", e);
+
+                    }
+
 
                     return PaymentResponse.from(saved);
                 });
+    }
+    private PaymentInitiatedPayload buildPaymentInitiatedPayload(Payment payment) {
+        return new PaymentInitiatedPayload(
+                payment.getId(),
+                payment.getMerchantId(),
+                payment.getSourceBankId(),
+                payment.getSourceAccountNumber(),
+                payment.getDestinationBankId(),
+                payment.getDestinationAccountNumber(),
+                payment.getAmount(),
+                payment.getCurrency(),
+                payment.getReference()
+        );
     }
 
     public PaymentResponse getPayment(UUID paymentId) {
@@ -65,4 +103,17 @@ public class PaymentService {
 
 
     }
+
+    // Inner record — the payload that goes into the outbox and then to Kafka
+    public record PaymentInitiatedPayload(
+            UUID paymentId,
+            String merchantId,
+            String sourceBankId,
+            String sourceAccountNumber,
+            String destinationBankId,
+            String destinationAccountNumber,
+            java.math.BigDecimal amount,
+            String currency,
+            String reference
+    ) {}
 }
