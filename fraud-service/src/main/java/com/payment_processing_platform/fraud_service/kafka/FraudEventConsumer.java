@@ -34,6 +34,15 @@ public class FraudEventConsumer {
 
             FraudCheckedEvent result = fraudRuleEngine.evaluate(event);
 
+            result.setSourceBankId(event.getSourceBankId());
+            result.setSourceAccountNumber(event.getSourceAccountNumber());
+            result.setDestinationBankId(event.getDestinationBankId());
+            result.setDestinationAccountNumber(event.getDestinationAccountNumber());
+            result.setAmount(event.getAmount());
+            result.setCurrency(event.getCurrency());
+            result.setReference(event.getReference());
+
+
             String payload = objectMapper.writeValueAsString(result);
 
             kafkaTemplate.send(

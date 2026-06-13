@@ -24,11 +24,12 @@ public class FraudRuleEngine {
         if (isSelfPayment(event)) {
             log.warn("FRAUD DETECTED — self payment on payment {}",
                     event.getPaymentId());
-            return new FraudCheckedEvent(
-                    event.getPaymentId(),
-                    "REJECTED",
-                    "SELF_PAYMENT_DETECTED"
-            );
+            return  FraudCheckedEvent.builder()
+                    .paymentId(event.getPaymentId())
+                    .result("REJECTED")
+                    .reason("SELF_PAYMENT_DETECTED")
+                    .build();
+
         }
 
         // Rule 2 — Large cross-bank amount
@@ -37,11 +38,12 @@ public class FraudRuleEngine {
         if (isCrossBankLargeAmount(event)) {
             log.warn("FRAUD DETECTED — large cross-bank amount {} {} on payment {}",
                     event.getAmount(), event.getCurrency(), event.getPaymentId());
-            return new FraudCheckedEvent(
-                    event.getPaymentId(),
-                    "REJECTED",
-                    "CROSS_BANK_LARGE_AMOUNT_EXCEEDED"
-            );
+            return FraudCheckedEvent.builder()
+                    .paymentId(event.getPaymentId())
+                    .result("REJECTED")
+                    .reason("CROSS_BANK_LARGE_AMOUNT_EXCEEDED")
+                    .build();
+
         }
 
         // Rule 3 — Null or zero amount
@@ -51,20 +53,22 @@ public class FraudRuleEngine {
                 event.getAmount().signum() <= 0) {
             log.warn("FRAUD DETECTED — invalid amount on payment {}",
                     event.getPaymentId());
-            return new FraudCheckedEvent(
-                    event.getPaymentId(),
-                    "REJECTED",
-                    "INVALID_AMOUNT"
-            );
+            return FraudCheckedEvent.builder()
+                    .paymentId(event.getPaymentId())
+                    .result("REJECTED")
+                    .reason("INVALID_AMOUNT")
+                    .build();
+
         }
 
         // All rules passed — approved
         log.info("Fraud check APPROVED for payment {}", event.getPaymentId());
-        return new FraudCheckedEvent(
-                event.getPaymentId(),
-                "APPROVED",
-                null
-        );
+        return FraudCheckedEvent.builder()
+                .paymentId(event.getPaymentId())
+                .result("APPROVED")
+                .reason(null)
+                .build();
+
     }
 
     private boolean isSelfPayment(PaymentInitiatedEvent event) {

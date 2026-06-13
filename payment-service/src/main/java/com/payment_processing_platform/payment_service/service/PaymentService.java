@@ -84,7 +84,6 @@ public class PaymentService {
     private PaymentInitiatedPayload buildPaymentInitiatedPayload(Payment payment) {
         return new PaymentInitiatedPayload(
                 payment.getId(),
-                payment.getMerchantId(),
                 payment.getSourceBankId(),
                 payment.getSourceAccountNumber(),
                 payment.getDestinationBankId(),
@@ -107,7 +106,6 @@ public class PaymentService {
     // Inner record — the payload that goes into the outbox and then to Kafka
     public record PaymentInitiatedPayload(
             UUID paymentId,
-            String merchantId,
             String sourceBankId,
             String sourceAccountNumber,
             String destinationBankId,
@@ -115,5 +113,6 @@ public class PaymentService {
             java.math.BigDecimal amount,
             String currency,
             String reference
+
     ) {}
 }

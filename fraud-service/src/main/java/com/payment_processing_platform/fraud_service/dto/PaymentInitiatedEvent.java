@@ -10,7 +10,6 @@ import java.util.UUID;
 @NoArgsConstructor
 public class PaymentInitiatedEvent {
     private UUID paymentId;
-    private String merchantId;
     private String sourceBankId;
     private String sourceAccountNumber;
     private String destinationBankId;
