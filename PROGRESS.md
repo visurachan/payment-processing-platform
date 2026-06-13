@@ -71,9 +71,12 @@
 - Stateless design — no persistence needed, rules run in memory
 - Separate from banking core fraud service — different concerns,
   different layer, different rules
+- Added 4 payment processor endpoints to banking-core-standalone —
+debit, credit, debit/reverse, exists — see
+    [banking-core-standalone](https://github.com/visurachan/banking-core-standalone#payment-processor-api)
 
 
-### Part 3 — Saga Happy Path
+### Part 3 — Accounts Service + Saga Happy Path
 *Next — Account service consumes FraudChecked, call banking core, publish AccountDebited*
 
 ### Part 3 — Saga Compensation 
