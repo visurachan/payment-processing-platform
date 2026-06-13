@@ -65,7 +65,7 @@
 - Publishes FraudChecked event to payments.fraud.checked topic
 - No database — purely event driven, consume and publish
 
-#### Key decisions
+#### Key decisions (Updated)
 - Kept fraud service lightweight —  three simple rules
   that only the platform can detect, not the individual bank
 - Stateless design — no persistence needed, rules run in memory
@@ -74,6 +74,19 @@
 - Added 4 payment processor endpoints to banking-core-standalone —
 debit, credit, debit/reverse, exists — see
     [banking-core-standalone](https://github.com/visurachan/banking-core-standalone#payment-processor-api)
+
+- Fat events — FraudCheckedEvent carries full payment context so Account
+Service is completely decoupled from Payment Service. No REST calls
+between platform services — every service gets what it needs from Kafka
+alone
+- merchantId and merchantCallbackUrl deliberately excluded from the event
+  chain — Payment Service reads these from its own payments table when
+  publishing PaymentCompleted. Each service reads its own data rather than
+  passing fields through events unnecessarily
+- Rule engine separation — FraudRuleEngine only sets fraud decision fields
+  (result, reason). FraudEventConsumer handles payment context enrichment
+  separately. Single responsibility — rule engine decides fraud, consumer
+  handles event construction
 
 
 ### Part 3 — Accounts Service + Saga Happy Path
