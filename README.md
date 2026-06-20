@@ -4,6 +4,11 @@ A distributed payment orchestration system built with **Java 21**, **Spring Boot
 
 Built as an extension of the [banking-core-api](https://github.com/visurachan/banking-core-api) ecosystem. Two instances of [banking-core-standalone](https://github.com/visurachan/banking-core-standalone) act as the simulated banks.
 
+> 🚧 **Actively in development.** This project is being built incrementally, phase
+> by phase. Follow real-time progress, architectural decisions, and problems
+> solved along the way in [PROGRESS.md](./PROGRESS.md).
+
+
 ---
 
 ## Services
