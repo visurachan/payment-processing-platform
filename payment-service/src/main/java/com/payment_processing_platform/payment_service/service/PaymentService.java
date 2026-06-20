@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -101,6 +102,50 @@ public class PaymentService {
                         new RuntimeException("Payment not found: "+ paymentId));
 
 
+    }
+    @Transactional
+    public void markCompleted(UUID paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+
+        payment.setStatus(PaymentStatus.COMPLETED);
+        paymentRepository.save(payment);
+
+        // Write PaymentCompleted to outbox
+        try {
+            String payload = objectMapper.writeValueAsString(
+                    Map.of(
+                            "paymentId", paymentId.toString(),
+                            "status", "COMPLETED"
+                    )
+            );
+
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateId(paymentId)
+                    .eventType("PaymentCompleted")
+                    .payload(payload)
+                    .build();
+
+            outboxRepository.save(outboxEvent);
+
+            log.info("Payment {} marked COMPLETED", paymentId);
+
+        } catch (Exception e) {
+            log.error("Failed to write PaymentCompleted outbox event", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Transactional
+    public void markFailed(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+
+        payment.setStatus(PaymentStatus.FAILED);
+        payment.setFailureReason(reason);
+        paymentRepository.save(payment);
+
+        log.info("Payment {} marked FAILED — reason: {}", paymentId, reason);
     }
 
     // Inner record — the payload that goes into the outbox and then to Kafka
