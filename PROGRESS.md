@@ -90,10 +90,37 @@ alone
 
 
 ### Part 3 — Accounts Service + Saga Happy Path
-*Next — Account service consumes FraudChecked, call banking core, publish AccountDebited*
 
-### Part 3 — Saga Compensation 
-*Not started*
+#### What was built
+- BankingCoreClient — calls banking core debit, credit, debit/reverse,
+  exists endpoints over HTTP 
+- IdempotencyService — tracks debit/credit operations with 24 hour expiry
+- AccountCoordinatorService — orchestrates debit source, credit destination,
+  publishes AccountDebited or PaymentFailed
+- FraudCheckedConsumer — routes APPROVED to account coordination,
+  REJECTED to PaymentFailed publication
+- PaymentEventConsumer (Payment Service) — consumes AccountDebited and
+  PaymentFailed, updates payment status accordingly
+
+
+#### Key decisions
+- Account Service checks both source and destination account existence
+  before attempting any bank calls — fail fast before touching money
+- Idempotency tracked per operation (debit/credit) not per payment —
+  allows partial completion tracking if process crashes mid-saga
+- Compensation only reverses debit, not credit — credit reversal would
+  only be needed in the rare case of Kafka publish failing after both
+  bank calls succeed, which is a known limitation requiring manual
+  reconciliation in production systems
+
+
+#### Verified end to end
+- £400 cross-bank payment → COMPLETED, ledger entries correct on both banks
+- £6000 cross-bank payment → FAILED, reason FRAUD_REJECTED_CROSS_BANK_LARGE_AMOUNT_EXCEEDED
+- Duplicate idempotency key → returns same payment, no duplicate record
+
+### Part 4 — Saga Compensation ⬜
+*Next — destination bank down scenario, debit reversal, dead letter topic*
 
 ---
 
