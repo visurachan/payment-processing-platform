@@ -93,9 +93,10 @@ public class BankingCoreClient {
                     .retrieve()
                     .toBodilessEntity();
             return true;
-        } catch (Exception e) {
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
             return false;
         }
+        // connection errors propagate so callers can distinguish bank-down from account-not-found
     }
 
     private String getBankUrl(String bankId) {

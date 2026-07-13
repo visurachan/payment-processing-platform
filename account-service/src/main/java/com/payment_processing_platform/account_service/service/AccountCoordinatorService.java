@@ -103,6 +103,14 @@ public class AccountCoordinatorService {
             log.info("Payment {} processed successfully — AccountDebited published",
                     paymentId);
 
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            if (idempotencyService.hasBeenProcessed(debitKey)) {
+                log.error("Bank unreachable after debit for payment {} — compensating", paymentId, e);
+                compensate(event);
+            } else {
+                log.error("Bank unreachable before debit for payment {} — failing without compensation", paymentId, e);
+                publishPaymentFailed(paymentId, "BANK_UNAVAILABLE");
+            }
         } catch (Exception e) {
             log.error("Failed to process payment {} — attempting compensation",
                     paymentId, e);
@@ -143,7 +151,7 @@ public class AccountCoordinatorService {
                     .build();
 
             String payload = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send("payments.failed", paymentId, payload);
+            kafkaTemplate.send("payments.account.failed", paymentId, payload);
 
             log.info("PaymentFailed published for payment {} — reason: {}",
                     paymentId, reason);

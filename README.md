@@ -55,8 +55,11 @@ Payment Service :8081  (Outbox → Kafka)
 - **Saga choreography** — services react to Kafka events, no central orchestrator
 - **Outbox pattern** — payment and Kafka publish written atomically; no dual-write risk
 - **Idempotency** — safe retries at both the API and the account coordination layer
-- **Circuit breaker** — Resilience4j wraps all HTTP calls to bank instances
-- **Distributed tracing** — Zipkin trace spans across all services per payment
+- **Saga compensation** — failed credit triggers automatic debit reversal; reversal skipped if debit was never confirmed
+- **Bank unavailability** — connection errors distinguished from account-not-found; BANK_UNAVAILABLE published without compensation if debit not yet taken
+- **Merchant webhooks** — payment outcomes POSTed to merchant callback URL with retry; webhook service fully decoupled via fat Kafka events
+- **Circuit breaker** — Resilience4j wraps all HTTP calls to bank instances *(Phase 3)*
+- **Distributed tracing** — Zipkin trace spans across all services per payment *(Phase 4)*
 
 ---
 

@@ -116,7 +116,8 @@ public class PaymentService {
             String payload = objectMapper.writeValueAsString(
                     Map.of(
                             "paymentId", paymentId.toString(),
-                            "status", "COMPLETED"
+                            "status", "COMPLETED",
+                            "merchantCallbackUrl", payment.getMerchantCallbackUrl()
                     )
             );
 
@@ -145,7 +146,30 @@ public class PaymentService {
         payment.setFailureReason(reason);
         paymentRepository.save(payment);
 
-        log.info("Payment {} marked FAILED — reason: {}", paymentId, reason);
+        try {
+            String payload = objectMapper.writeValueAsString(
+                    Map.of(
+                            "paymentId", paymentId.toString(),
+                            "reason", reason,
+                            "status", "FAILED",
+                            "merchantCallbackUrl", payment.getMerchantCallbackUrl()
+                    )
+            );
+
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateId(paymentId)
+                    .eventType("PaymentFailed")
+                    .payload(payload)
+                    .build();
+
+            outboxRepository.save(outboxEvent);
+
+            log.info("Payment {} marked FAILED — reason: {}", paymentId, reason);
+
+        } catch (Exception e) {
+            log.error("Failed to write PaymentFailed outbox event", e);
+            throw new RuntimeException(e);
+        }
     }
 
     // Inner record — the payload that goes into the outbox and then to Kafka

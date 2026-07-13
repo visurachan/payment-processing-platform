@@ -38,7 +38,7 @@ public class PaymentEventConsumer {
     }
 
     @KafkaListener(
-            topics = "payments.failed",
+            topics = "payments.account.failed",
             groupId = "payment-service-group"
     )
     public void onPaymentFailed(String message) {

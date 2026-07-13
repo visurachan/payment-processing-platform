@@ -7,7 +7,6 @@
 
 ## Phase 1 — Foundation ✅
 
-
 ### What was built
 - API Gateway with Spring Cloud Gateway routing all external traffic
 - Merchant API key authentication — gateway validates key against payment
@@ -27,10 +26,10 @@
 - 202 Accepted not 200 OK — payment is queued not completed instantly
 
 
-## Phase 2 — Core Saga 
-**In progress — Started June 2026**
+## Phase 2 — Core Saga ✅
+**Completed July 2026**
 
-### Part 1 — Outbox Pattern 
+### Part 1 — Outbox Pattern ✅
 
 #### What was built
 - OutboxPublisher — @Scheduled poller running every 500ms
@@ -48,7 +47,7 @@
   services only get what they need, no internal fields exposed
 - paymentId used as Kafka message key — guarantees all events for same
   payment land on same partition in order
-- Kafka auto-creates topics 
+- Kafka auto-creates topics
 - .get(5, TimeUnit.SECONDS) blocks until Kafka confirms receipt —
   event stays PENDING until we know Kafka got it
 
@@ -65,20 +64,19 @@
 - Publishes FraudChecked event to payments.fraud.checked topic
 - No database — purely event driven, consume and publish
 
-#### Key decisions (Updated)
-- Kept fraud service lightweight —  three simple rules
+#### Key decisions
+- Kept fraud service lightweight — three simple rules
   that only the platform can detect, not the individual bank
 - Stateless design — no persistence needed, rules run in memory
 - Separate from banking core fraud service — different concerns,
   different layer, different rules
 - Added 4 payment processor endpoints to banking-core-standalone —
-debit, credit, debit/reverse, exists — see
-    [banking-core-standalone](https://github.com/visurachan/banking-core-standalone#payment-processor-api)
-
+  debit, credit, debit/reverse, exists — see
+  [banking-core-standalone](https://github.com/visurachan/banking-core-standalone#payment-processor-api)
 - Fat events — FraudCheckedEvent carries full payment context so Account
-Service is completely decoupled from Payment Service. No REST calls
-between platform services — every service gets what it needs from Kafka
-alone
+  Service is completely decoupled from Payment Service. No REST calls
+  between platform services — every service gets what it needs from Kafka
+  alone
 - merchantId and merchantCallbackUrl deliberately excluded from the event
   chain — Payment Service reads these from its own payments table when
   publishing PaymentCompleted. Each service reads its own data rather than
@@ -89,11 +87,11 @@ alone
   handles event construction
 
 
-### Part 3 — Accounts Service + Saga Happy Path
+### Part 3 — Account Service + Saga ✅
 
 #### What was built
 - BankingCoreClient — calls banking core debit, credit, debit/reverse,
-  exists endpoints over HTTP 
+  exists endpoints over HTTP
 - IdempotencyService — tracks debit/credit operations with 24 hour expiry
 - AccountCoordinatorService — orchestrates debit source, credit destination,
   publishes AccountDebited or PaymentFailed
@@ -101,7 +99,22 @@ alone
   REJECTED to PaymentFailed publication
 - PaymentEventConsumer (Payment Service) — consumes AccountDebited and
   PaymentFailed, updates payment status accordingly
+- COMPLETED and FAILED outcomes written to outbox → published to
+  payments.completed and payments.failed
 
+#### Saga compensation
+- If debit succeeds but credit fails — debit is reversed via
+  banking-core-standalone reverse endpoint
+- Compensation only runs if idempotency key confirms debit was stored —
+  no blind reversal attempts
+- CRITICAL failures (reversal itself fails) logged for manual intervention
+
+#### Bank unavailability handling
+- accountExists() only catches 404 — connection errors propagate
+- ResourceAccessException caught separately in processApprovedPayment:
+  - If debit not yet recorded → publishes BANK_UNAVAILABLE immediately,
+    no compensation needed
+  - If debit already recorded → runs compensation to reverse it
 
 #### Key decisions
 - Account Service checks both source and destination account existence
@@ -113,14 +126,30 @@ alone
   bank calls succeed, which is a known limitation requiring manual
   reconciliation in production systems
 
-
 #### Verified end to end
 - £400 cross-bank payment → COMPLETED, ledger entries correct on both banks
 - £6000 cross-bank payment → FAILED, reason FRAUD_REJECTED_CROSS_BANK_LARGE_AMOUNT_EXCEEDED
 - Duplicate idempotency key → returns same payment, no duplicate record
+- Source bank down → FAILED, reason BANK_UNAVAILABLE, no compensation attempted
 
-### Part 4 — Saga Compensation ⬜
-*Next — destination bank down scenario, debit reversal, dead letter topic*
+
+### Part 4 — Webhook Service ✅
+
+#### What was built
+- Webhook service consumes payments.completed and payments.failed topics
+- Fires HTTP POST to merchantCallbackUrl with payment outcome
+- Retry logic — 3 attempts with increasing backoff (1s, 2s, 3s)
+- Skips delivery gracefully if no merchantCallbackUrl on the event
+- merchantCallbackUrl included in outbox payload by Payment Service so
+  webhook service is fully decoupled — no REST call back to payment service
+
+#### Key decisions
+- Full decoupling — webhook service reads everything it needs from the
+  Kafka event, never calls another service
+- StringDeserializer for Kafka consumer — messages are plain JSON strings,
+  not typed objects
+- Null-safe callback URL check — old events without the field are skipped
+  with a warning rather than crashing
 
 ---
 
@@ -134,5 +163,5 @@ alone
 
 ---
 
-## Phase 5 — Deploy + Apply 
+## Phase 5 — Deploy + Apply ⬜
 *Not started*
